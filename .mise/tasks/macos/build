@@ -8,8 +8,38 @@ set -euo pipefail
 # Compile the shared Icon Composer source, including the legacy .icns fallback.
 assets="$PWD/target/package/macos-assets"
 mkdir -p "$assets"
-xcrun actool platform/shared/Glue5.icon --compile "$assets" \
-    --platform macosx --minimum-deployment-target 14.0 --app-icon Glue5 \
-    --output-partial-info-plist "$assets/Info.plist" --output-format human-readable-text
+compile_icon() {
+    DEVELOPER_DIR="$1" xcrun actool platform/shared/Glue5.icon --compile "$assets" \
+        --platform macosx --minimum-deployment-target 14.0 --app-icon Glue5 \
+        --output-partial-info-plist "$assets/Info.plist" --output-format human-readable-text
+}
+
+selected=${DEVELOPER_DIR:-$(xcode-select -p)}
+if ! compile_icon "$selected"; then
+    echo "::warning::actool failed with ${selected}; retrying with other Xcode 26 installs."
+    for pattern in \
+        '/Applications/Xcode_26.1*.app' \
+        '/Applications/Xcode_26.0*.app' \
+        '/Applications/Xcode_26.2*.app' \
+        '/Applications/Xcode_26.app' \
+        '/Applications/Xcode_26.3*.app'
+    do
+        while IFS= read -r xcode; do
+            [ -n "$xcode" ] || continue
+            developer_dir="$xcode/Contents/Developer"
+            [ "$developer_dir" = "$selected" ] && continue
+            echo "retrying actool with $xcode"
+            if compile_icon "$developer_dir"; then
+                export DEVELOPER_DIR="$developer_dir"
+                selected="$developer_dir"
+                break 2
+            fi
+        done < <(ls -d $pattern 2>/dev/null | sort -V || true)
+    done
+fi
+[ -f "$assets/Assets.car" ] && [ -f "$assets/Glue5.icns" ] || {
+    echo "::error::actool failed to produce Assets.car and Glue5.icns with all available Xcode 26 installs."
+    exit 1
+}
 cargo packager --release --formats app
 echo "built $PWD/target/package/Glue 5.app"
