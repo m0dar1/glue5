@@ -93,8 +93,13 @@ jobs:
           # Xcode 26.3's standalone actool crashes on macos-15 runners while
           # compiling the Icon Composer source; prefer the newest 26.2/26.1/26.0.
           xcode=
-          for v in 26.2 26.1 26.0 26; do
-              xcode=$(ls -d /Applications/Xcode_"$v"*.app 2>/dev/null | grep -E '/Xcode_26(\.[0-9]+)*\.app$' | sort -V | tail -n 1 || true)
+          for pattern in \
+              '/Applications/Xcode_26.2*.app' \
+              '/Applications/Xcode_26.1*.app' \
+              '/Applications/Xcode_26.0*.app' \
+              '/Applications/Xcode_26.app'
+          do
+              xcode=$(ls -d $pattern 2>/dev/null | grep -E '/Xcode_26(\.(2|1|0)(\.[0-9]+)*)?\.app$' | sort -V | tail -n 1 || true)
               [ -n "$xcode" ] && break
           done
           if [ -z "$xcode" ]; then
