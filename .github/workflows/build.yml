@@ -90,7 +90,13 @@ jobs:
       - name: Xcode 26
         if: runner.os == 'macOS'
         run: |
-          xcode=$(ls -d /Applications/Xcode_26*.app | grep -E '/Xcode_26(\.[0-9]+)*\.app$' | sort -V | tail -n 1 || true)
+          # Xcode 26.3's standalone actool crashes on macos-15 runners while
+          # compiling the Icon Composer source; prefer the newest 26.2/26.1/26.0.
+          xcode=
+          for v in 26.2 26.1 26.0 26; do
+              xcode=$(ls -d /Applications/Xcode_"$v"*.app 2>/dev/null | grep -E '/Xcode_26(\.[0-9]+)*\.app$' | sort -V | tail -n 1 || true)
+              [ -n "$xcode" ] && break
+          done
           if [ -z "$xcode" ]; then
               echo "::error::No Xcode 26 on this machine: GitHub's macOS image has changed."
               exit 1
